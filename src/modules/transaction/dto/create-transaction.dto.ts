@@ -1,13 +1,31 @@
 import { TransactionType } from '@prisma/client';
-import { IsEnum, IsString, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsISO8601,
+  IsNumber,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
-export class CreateTransactionDto {
-  @IsString({ message: 'Title must be a string' })
-  @MinLength(5, { message: 'Title must be at least 5 characters long' })
-  title: string;
-  category: string;
-  data: Date;
-  price: number;
-  @IsEnum(TransactionType)
-  type: TransactionType;
+export class CriarTransacaoDto {
+  @IsString({ message: 'título deve ser uma string' })
+  @MinLength(5, { message: 'título deve ter pelo menos 5 caracteres' })
+  titulo: string;
+
+  @IsString({ message: 'categoria deve ser uma string' })
+  @MinLength(3, { message: 'categoria deve ter pelo menos 3 caracteres' })
+  categoria: string;
+
+  @IsISO8601(
+    { strict: true },
+    { message: 'data deve ser uma string ISO8601 válida' },
+  )
+  data: string;
+
+  @IsNumber({}, { message: 'preço deve ser um número' })
+  preco: number;
+
+  @IsEnum(TransactionType, { message: 'tipo deve ser INCOME ou OUTCOME' })
+  tipo: TransactionType;
 }
