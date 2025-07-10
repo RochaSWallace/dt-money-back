@@ -1,10 +1,12 @@
-export class Transacao {
+import { TransactionType } from './transaction-type.entity';
+
+export class Transaction {
   id: string;
-  titulo: string;
-  categoria: string;
+  title: string;
+  price: number;
+  category: string;
   data: Date;
-  preco: number;
-  tipo: 'INCOME' | 'OUTCOME';
-  criadoEm: Date;
-  atualizadoEm: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  type: (typeof TransactionType)[keyof typeof TransactionType];
 }

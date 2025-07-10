@@ -7,114 +7,68 @@ import {
   Param,
   Delete,
   Res,
+  HttpStatus,
+  Query,
+  ValidationPipe,
 } from '@nestjs/common';
-import { TransacaoService } from './transaction.service';
-import { CriarTransacaoDto } from './dto/criar-transacao.dto';
-import { AtualizarTransacaoDto } from './dto/atualizar-transacao.dto';
+import { TransactionService } from './transaction.service';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { Response } from 'express';
-import { isUUID } from 'class-validator';
+import { PaginationFilters } from './entities/pagination-filters';
 
-@Controller('transacao')
-export class TransacaoController {
-  constructor(private readonly transacaoService: TransacaoService) {}
+@Controller('transaction')
+export class TransactionController {
+  constructor(private readonly transactionService: TransactionService) {}
 
   @Post()
-  async criar(
-    @Body() criarTransacaoDto: CriarTransacaoDto,
+  async create(
+    @Body() createTransactionDto: CreateTransactionDto,
     @Res() res: Response,
   ) {
-    const transacaoCriada =
-      await this.transacaoService.criar(criarTransacaoDto);
-    res.status(201).send(transacaoCriada);
+    const createdTransaction =
+      await this.transactionService.create(createTransactionDto);
+    res.status(HttpStatus.CREATED).send(createdTransaction);
     return;
   }
 
   @Get()
-  async buscarTodas(@Res() res: Response) {
-    const transacoes = await this.transacaoService.buscarTodas();
-    res.status(200).send(transacoes);
-    return;
+  async findAll(
+    @Query(new ValidationPipe({ transform: true })) query: PaginationFilters,
+    @Res() res: Response,
+  ) {
+    if (!query.page) {
+      query.page = 1;
+    }
+    if (!query.perPage) {
+      query.perPage = 10;
+    }
+    const transactionsPage = await this.transactionService.findPage(query);
+    return res.status(HttpStatus.OK).send(transactionsPage);
   }
 
   @Get(':id')
-  async buscarPorId(@Param('id') id: string, @Res() res: Response) {
-    if (!isUUID(id)) {
-      res.status(404).send({
-        message: 'transação não encontrada',
-        error: 'Não Encontrado',
-        statusCode: 404,
-      });
-      return;
-    }
-
-    const transacao = await this.transacaoService.buscarPorId(id);
-    if (!transacao) {
-      res.status(404).send({
-        message: 'transação não encontrada',
-        error: 'Não Encontrado',
-        statusCode: 404,
-      });
-      return;
-    }
-    res.status(200).send(transacao);
-    return;
+  async findOne(@Param('id') id: string, @Res() res: Response) {
+    const foundTransaction = await this.transactionService.findOne(id);
+    return res.status(HttpStatus.OK).send(foundTransaction);
   }
 
   @Patch(':id')
-  async atualizar(
+  async update(
     @Param('id') id: string,
-    @Body() atualizarTransacaoDto: AtualizarTransacaoDto,
+    @Body() updateTransactionDto: UpdateTransactionDto,
     @Res() res: Response,
   ) {
-    if (!isUUID(id)) {
-      res.status(404).send({
-        message: 'transação não encontrada',
-        error: 'Não Encontrado',
-        statusCode: 404,
-      });
-      return;
-    }
-
-    const transacaoAtualizada = await this.transacaoService.atualizar(
+    const updatedTransaction = await this.transactionService.update(
       id,
-      atualizarTransacaoDto,
+      updateTransactionDto,
     );
-
-    if (!transacaoAtualizada) {
-      res.status(404).send({
-        message: 'transação não encontrada',
-        error: 'Não Encontrado',
-        statusCode: 404,
-      });
-      return;
-    }
-
-    res.status(200).send(transacaoAtualizada);
-    return;
+    return res.status(HttpStatus.OK).send(updatedTransaction);
   }
 
   @Delete(':id')
-  async remover(@Param('id') id: string, @Res() res: Response) {
-    if (!isUUID(id)) {
-      res.status(404).send({
-        message: 'transação não encontrada',
-        error: 'Não Encontrado',
-        statusCode: 404,
-      });
-      return;
-    }
-
-    const transacaoExiste = await this.transacaoService.remover(id);
-    if (!transacaoExiste) {
-      res.status(404).send({
-        message: 'transação não encontrada',
-        error: 'Não Encontrado',
-        statusCode: 404,
-      });
-      return;
-    }
-
-    res.sendStatus(204);
-    return;
+  async remove(@Param('id') id: string, @Res() res: Response) {
+    await this.transactionService.remove(id);
+    return res.status(HttpStatus.NO_CONTENT).send();
   }
 }

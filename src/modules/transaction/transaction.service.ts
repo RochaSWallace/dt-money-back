@@ -1,82 +1,101 @@
-import { Injectable } from '@nestjs/common';
-import { CriarTransacaoDto } from './dto/criar-transacao.dto';
-import { AtualizarTransacaoDto } from './dto/atualizar-transacao.dto';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { PrismaService } from 'src/modules/prisma/prisma.service';
-import { Transacao } from './entities/transacao.entity';
+import { PaginationFilters } from './entities/pagination-filters';
+import { TransactionPageDto } from './dto/transaction-page.dto';
 
 @Injectable()
-export class TransacaoService {
+export class TransactionService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async criar({ categoria, data, preco, titulo, tipo }: CriarTransacaoDto) {
-    const dataObj = new Date(data);
-    const transacaoCriada = await this.prisma.transaction.create({
+  async create({ category, data, price, title, type }: CreateTransactionDto) {
+    const createdTransaction = await this.prisma.transaction.create({
       data: {
-        title: titulo,
-        category: categoria,
-        data: dataObj,
-        price: preco,
-        type: tipo,
+        title,
+        category,
+        data,
+        price,
+        type,
       },
     });
-    return transacaoCriada;
+    return createdTransaction;
   }
 
-  async buscarTodas(): Promise<Transacao[]> {
-    const transacoes = await this.prisma.transaction.findMany({
-      orderBy: {
-        data: 'desc',
+  async findPage(filters: PaginationFilters): Promise<TransactionPageDto> {
+    const total = await this.prisma.transaction.count();
+    const totalTransactions = await this.prisma.transaction.groupBy({
+      by: ['type'],
+      _sum: {
+        price: true,
       },
     });
-    return transacoes;
-  }
+    const totalIncome =
+      totalTransactions.find((transaction) => transaction.type === 'INCOME')
+        ?._sum.price || 0;
+    const totalOutcome =
+      totalTransactions.find((transaction) => transaction.type === 'OUTCOME')
+        ?._sum.price || 0;
+    const totalBalance = totalIncome - totalOutcome;
+    const pageInfo = new TransactionPageDto(
+      filters.page,
+      filters.perPage,
+      [],
+      total,
+      {
+        total: totalBalance,
+        totalIncome: totalIncome,
+        totalOutcome: totalOutcome,
+      },
+    );
 
-  async buscarPorId(id: string): Promise<Transacao | null> {
-    const transacao = await this.prisma.transaction.findUnique({
-      where: {
-        id,
-      },
-    });
-    return transacao;
-  }
-
-  async atualizar(
-    id: string,
-    atualizarTransacaoDto: AtualizarTransacaoDto,
-  ): Promise<Transacao | false> {
-    const transacaoExiste = await this.prisma.transaction.findUnique({
-      where: {
-        id,
-      },
-    });
-    if (!transacaoExiste) {
-      return false;
+    if (total === 0 || filters.skip >= total) {
+      return pageInfo;
     }
 
-    const transacaoAtualizada = await this.prisma.transaction.update({
-      where: {
-        id,
-      },
-      data: atualizarTransacaoDto,
+    const transactions = await this.prisma.transaction.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip: filters.skip,
+      take: filters.take,
     });
-    return transacaoAtualizada;
+    pageInfo.data = transactions;
+    return pageInfo;
   }
 
-  async remover(id: string): Promise<boolean> {
-    const transacaoExiste = await this.prisma.transaction.findUnique({
-      where: {
-        id,
-      },
+  async findOne(id: string) {
+    const foundTransaction = await this.prisma.transaction.findUnique({
+      where: { id },
     });
-    if (!transacaoExiste) {
-      return false;
+    return foundTransaction;
+  }
+
+  async update(id: string, updateTransactionDto: UpdateTransactionDto) {
+    const foundTransaction = await this.findOne(id);
+
+    if (!foundTransaction) {
+      throw new BadRequestException(`Transaction with id ${id} not found`);
+    }
+
+    const updatedTransaction = await this.prisma.transaction.update({
+      where: { id },
+      data: updateTransactionDto,
+    });
+    return updatedTransaction;
+  }
+
+  async remove(id: string) {
+    const foundTransaction = await this.findOne(id);
+
+    if (!foundTransaction) {
+      throw new NotFoundException(`Transaction with id ${id} not found`);
     }
 
     await this.prisma.transaction.delete({
-      where: {
-        id,
-      },
+      where: { id },
     });
-    return true;
   }
 }
